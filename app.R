@@ -26,14 +26,16 @@ ui <- fluidPage(
                mainPanel(plotlyOutput(outputId = "plot"))
              )
     ),
-  #this tab is not showing up but the sidebar is?           
-  tabPanel("murder dataset", fluid = TRUE,
-           sidebarLayout(
-             sidebarPanel( h2("Murder Through Time"),
-                           uiOutput("murder_y_var_render")),
-             mainPanel(plotlyOutput(outputId = "plot_two"))
-           ))
-))
+    
+    #this tab is not showing up but the sidebar is?           
+    tabPanel("Murder Dataset", fluid = TRUE,
+             sidebarLayout(
+               sidebarPanel( h2("Murder Through Time"),
+                             uiOutput("murder_y_var_render")),
+               mainPanel(plotlyOutput(outputId = "plot_two"))
+             ))
+  )
+)
 
 
 #"old code' that creates two plot tabs 
@@ -103,6 +105,7 @@ server <- function(input, output) {
   output$plot <- renderPlotly({
     
     if (is.null(input$data_format)) {return(NULL)}
+    if (is.null(input$y_var)) {return(NULL)}
     
     if (input$data_format == "Count") {
       
@@ -151,7 +154,13 @@ server <- function(input, output) {
   #trying to make this plot be for the murder dataset, not showing up
   output$plot_two <- renderPlotly({
     
-    plot_df_murder <- tibble(murder_data) %>%
+    if (is.null(input$var_y)) {return(NULL)}
+    
+    MonthConversion <- c("January", "February", "March", "April", "May", "June",
+                         "July", "August", "September", "October", "November", "December")
+    
+    plot_df_murder <-  murder_data %>%
+      mutate(Month = match(Month, MonthConversion)) %>%
       mutate(mo_yr = as.Date(str_c(Year, Month, "01", sep = "-"))) %>%
       select(mo_yr, everything())
     
@@ -167,7 +176,6 @@ server <- function(input, output) {
       ggplotly()
     
   })
-}
   
   
   #output$table <- renderDT({
@@ -190,7 +198,7 @@ server <- function(input, output) {
   #  
   #})
   
-  
-  
-  
+}  
+
+
 shinyApp(ui = ui, server = server)
