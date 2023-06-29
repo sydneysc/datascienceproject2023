@@ -25,8 +25,7 @@ ui <- fluidPage(
                                          multiple = FALSE)),
                mainPanel(plotlyOutput(outputId = "plot"))
              )
-    )
-  ),
+    ),
   #this tab is not showing up but the sidebar is?           
   tabPanel("murder dataset", fluid = TRUE,
            sidebarLayout(
@@ -34,7 +33,7 @@ ui <- fluidPage(
                            uiOutput("murder_y_var_render")),
              mainPanel(plotlyOutput(outputId = "plot_two"))
            ))
-)
+))
 
 
 #"old code' that creates two plot tabs 
@@ -168,6 +167,7 @@ server <- function(input, output) {
       ggplotly()
     
   })
+}
   
   
   #output$table <- renderDT({
@@ -193,4 +193,4 @@ server <- function(input, output) {
   
   
   
-  shinyApp(ui = ui, server = server)
+shinyApp(ui = ui, server = server)
