@@ -10,7 +10,7 @@ library(here)
 count_data <- read.csv(file.path("www", "Final_DSP_Dataset_v3.csv"))
 proportion_data <- read.csv(file.path("www", "DSP_Data_Proportions_by_Samp.csv"))
 murder_data_count <- read.csv(file.path("www", "Cleaned_Murder_Data_Logan_By_Month.csv"))
-murder_data_prop <- read.csv(file.path("www", "MurderCountsbyPopx100000.csv"))
+murder_data_prop <- read.csv(file.path("www", "MurderCountsbyPopxln.csv"))
 
 
 ui <- fluidPage(
