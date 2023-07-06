@@ -8,7 +8,7 @@ library(stringr)
 library(here)
 
 count_data <- read.csv(file.path("www", "Final_DSP_Dataset_v3.csv"))
-proportion_data <- read.csv(file.path("www", "DSP_Data_Proportions_by_Pop.csv"))
+proportion_data <- read.csv(file.path("www", "DSP_Data_Proportions_by_Samp.csv"))
 murder_data <- read.csv(file.path("www", "Cleaned_Murder_Data_Logan_By_Month.csv"))
 #murder_data <- read.csv("/Users/schw939/DSproject_2023/murderdata.csv")
 
