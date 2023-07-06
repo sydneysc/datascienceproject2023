@@ -9,8 +9,8 @@ library(here)
 
 count_data <- read.csv(file.path("www", "Final_DSP_Dataset_v3.csv"))
 proportion_data <- read.csv(file.path("www", "DSP_Data_Proportions_by_Samp.csv"))
-murder_data <- read.csv(file.path("www", "Cleaned_Murder_Data_Logan_By_Month.csv"))
-#murder_data <- read.csv("/Users/schw939/DSproject_2023/murderdata.csv")
+murder_data_count <- read.csv(file.path("www", "Cleaned_Murder_Data_Logan_By_Month.csv"))
+murder_data_prop <- read.csv(file.path("www", "MurderCountsbyPopx100000.csv"))
 
 
 ui <- fluidPage(
@@ -27,41 +27,17 @@ ui <- fluidPage(
              )
     ),
     
-    #this tab is not showing up but the sidebar is?           
     tabPanel("Murder Dataset", fluid = TRUE,
              sidebarLayout(
                sidebarPanel( h2("Murder Through Time"),
-                             uiOutput("murder_y_var_render")),
+                             uiOutput("murder_y_var_render"),
+                             selectInput(inputId = "murder_data_format", label = "Select data format",
+                                         choices = list("Log Transformed Proportions" = "Proportion", "Count" = "Count"),
+                                         multiple = FALSE)),
                mainPanel(plotlyOutput(outputId = "plot_two"))
              ))
   )
 )
-
-
-#"old code' that creates two plot tabs 
-
-#  titlePanel(""),
-# sidebarLayout(
-#   sidebarPanel(
-#     h2("Crime Through Time"),
-#     uiOutput("y_var_render"),
-#    selectInput(inputId = "data_format", label = "Select data format",
-#                choices = list("Log Transformed Proportions" = "Proportion", "Count" = "Count"),
-#                multiple = FALSE)
-# 
-#   ),
-#   mainPanel(
-#     tabsetPanel(type = "tab",
-#                 tabPanel("Crime Victimization Survey",  plotlyOutput("plot")),
-#                 tabPanel("Murder Dataset")
-#                 ),
-#     
-
-#  plotlyOutput(outputId = "plot"),
-#  em("This is a plot that shows the different values in the crime dataset"),
-#  DT::dataTableOutput(outputId = "table")
-#     )
-#   )
 
 
 server <- function(input, output) {
@@ -93,11 +69,29 @@ server <- function(input, output) {
   })
   
   output$murder_y_var_render <- renderUI({
+    
+    if (is.null(input$murder_data_format)) {return(NULL)}
+    
+    if (input$murder_data_format == "Count") {
+    
     pickerInput(inputId = "var_y", label = "Select y-axis variable",
                 selected = "referenceSex_male",
-                choices = colnames(murder_data[5:length(colnames(murder_data))]),
+                choices = colnames(murder_data_count[5:length(colnames(murder_data_count))]),
                 options = list(`live-search` = TRUE),
-                multiple = FALSE)})
+                multiple = FALSE)
+      
+    } else if (input$murder_data_format == "Proportion") { 
+      
+    pickerInput(inputId = "var_y", label = "Select y-axis variable",
+                  selected = "referenceSex_male",
+                  choices = colnames(murder_data_prop[5:length(colnames(murder_data_prop))]),
+                  options = list(`live-search` = TRUE),
+                  multiple = FALSE)
+      
+    }
+    
+    
+  })
   
   
   
@@ -154,12 +148,18 @@ server <- function(input, output) {
   #trying to make this plot be for the murder dataset, not showing up
   output$plot_two <- renderPlotly({
     
+    if (is.null(input$murder_data_format)) {return(NULL)}
     if (is.null(input$var_y)) {return(NULL)}
+    
+    if (input$murder_data_format == "Count") {
+      
+    
+    #if (is.null(input$var_y)) {return(NULL)}
     
     MonthConversion <- c("January", "February", "March", "April", "May", "June",
                          "July", "August", "September", "October", "November", "December")
     
-    plot_df_murder <-  murder_data %>%
+    plot_df_murder <-  murder_data_count %>%
       mutate(Month = match(Month, MonthConversion)) %>%
       mutate(mo_yr = as.Date(str_c(Year, Month, "01", sep = "-"))) %>%
       select(mo_yr, everything())
@@ -175,7 +175,39 @@ server <- function(input, output) {
         theme(axis.text.x = element_text(angle = 45))) %>%
       ggplotly()
     
-  })
+#  })
+  
+  } else if (input$murder_data_format == "Proportion") {
+    
+    ggplotly({
+      
+      MonthConversion <- c("January", "February", "March", "April", "May", "June",
+                           "July", "August", "September", "October", "November", "December")
+      
+      plot_df_murder <- murder_data_prop %>%
+        mutate(Month = match(Month, MonthConversion)) %>%
+        mutate(mo_yr = as.Date(str_c(Year, Month, "01", sep = "-"))) %>%
+        select(mo_yr, everything())
+      
+      p <- ggplot(plot_df_murder,
+                  aes_string(x = "mo_yr", y = input$var_y, color = "Region")) + 
+        geom_point(alpha = 0.5) + 
+        geom_line() +
+        theme(legend.position = "none") + 
+        xlab("Month & Year") +
+        ylab("Log Transformed Proportion") +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45))
+      #scale_x_date(labels = date_format("%m-%Y"))
+      
+      p
+      
+    })
+    
+  }
+  
+  
+})
   
   
   #output$table <- renderDT({
