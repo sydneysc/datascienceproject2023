@@ -4,13 +4,14 @@ library(tibble)
 library(plotly)
 library(ggplot2)
 library(DT)
+library(data.table)
 library(stringr)
 library(here)
 
-count_data <- read.csv(file.path("www", "Final_DSP_Dataset_v3.csv"))
-proportion_data <- read.csv(file.path("www", "DSP_Data_Proportions_by_Samp.csv"))
-murder_data_count <- read.csv(file.path("www", "Cleaned_Murder_Data_Logan_By_Month.csv"))
-murder_data_prop <- read.csv(file.path("www", "MurderCountsbyPopxln.csv"))
+count_data <- fread(file.path("www", "FINAL_NCVS_Dataset_Model_Counts.csv"))
+proportion_data <- fread(file.path("www", "FINAL_NCVS_Dataset_Model_Proportions.csv"))
+murder_data_count <- fread(file.path("www", "FINAL_Murder_Dataset_Model_Counts.csv"))
+murder_data_prop <- fread(file.path("www", "FINAL_Murder_Dataset_Model_Proportions.csv"))
 
 
 ui <- fluidPage(
@@ -18,7 +19,7 @@ ui <- fluidPage(
   tabsetPanel(
     tabPanel("Crime Victimization Survey", fluid = TRUE,
              sidebarLayout(
-               sidebarPanel( h2("Crime Through Time"),
+               sidebarPanel( h2("Crime Victim Profiles through Time"),
                              uiOutput("y_var_render"),
                              selectInput(inputId = "data_format", label = "Select data format",
                                          choices = list("Log Transformed Proportions" = "Proportion", "Count" = "Count"),
@@ -29,7 +30,7 @@ ui <- fluidPage(
     
     tabPanel("Murder Dataset", fluid = TRUE,
              sidebarLayout(
-               sidebarPanel( h2("Murder Through Time"),
+               sidebarPanel( h2("Murder Victim Profiles through Time"),
                              uiOutput("murder_y_var_render"),
                              selectInput(inputId = "murder_data_format", label = "Select data format",
                                          choices = list("Log Transformed Proportions" = "Proportion", "Count" = "Count"),
@@ -51,7 +52,7 @@ server <- function(input, output) {
       
       pickerInput(inputId = "y_var", label = "Select y-axis variable",
                   selected = "TotalCrime",
-                  choices = colnames(count_data[4:length(colnames(count_data))]),
+                  choices = colnames(count_data)[4:ncol(count_data)],
                   options = list(`live-search` = TRUE),
                   multiple = FALSE)
       
@@ -59,7 +60,7 @@ server <- function(input, output) {
       
       pickerInput(inputId = "y_var", label = "Select y-axis variable",
                   selected = "TotalCrime",
-                  choices = colnames(proportion_data[5:length(colnames(proportion_data))]),
+                  choices = colnames(proportion_data)[4:ncol(proportion_data)],
                   options = list(`live-search` = TRUE),
                   multiple = FALSE)
       
@@ -76,7 +77,7 @@ server <- function(input, output) {
     
     pickerInput(inputId = "var_y", label = "Select y-axis variable",
                 selected = "referenceSex_male",
-                choices = colnames(murder_data_count[5:length(colnames(murder_data_count))]),
+                choices = colnames(murder_data_count)[4:ncol(murder_data_count)],
                 options = list(`live-search` = TRUE),
                 multiple = FALSE)
       
@@ -84,7 +85,7 @@ server <- function(input, output) {
       
     pickerInput(inputId = "var_y", label = "Select y-axis variable",
                   selected = "referenceSex_male",
-                  choices = colnames(murder_data_prop[5:length(colnames(murder_data_prop))]),
+                  choices = colnames(murder_data_prop)[4:ncol(murder_data_prop)],
                   options = list(`live-search` = TRUE),
                   multiple = FALSE)
       
@@ -92,8 +93,6 @@ server <- function(input, output) {
     
     
   })
-  
-  
   
   
   output$plot <- renderPlotly({
@@ -107,8 +106,7 @@ server <- function(input, output) {
         mutate(mo_yr = as.Date(str_c(Year, Month, "01", sep = "-"))) %>%
         select(mo_yr, everything())
       
-      (ggplot(plot_df,
-              aes_string(x = "mo_yr", y = input$y_var, color = "Region")) + 
+      (ggplot(plot_df, aes(x = mo_yr, y = .data[[input$y_var]], color = Region)) + 
           geom_point(alpha = 0.5) + 
           geom_line() +
           theme(legend.position = "none") + 
@@ -126,8 +124,7 @@ server <- function(input, output) {
           mutate(mo_yr = as.Date(str_c(Year, Month, "01", sep = "-"))) %>%
           select(mo_yr, everything())
         
-        p <- ggplot(plot_df,
-                    aes_string(x = "mo_yr", y = input$y_var, color = "Region")) + 
+        p <- ggplot(plot_df, aes(x = mo_yr, y = .data[[input$y_var]], color = Region)) + 
           geom_point(alpha = 0.5) + 
           geom_line() +
           theme(legend.position = "none") + 
@@ -164,8 +161,7 @@ server <- function(input, output) {
       mutate(mo_yr = as.Date(str_c(Year, Month, "01", sep = "-"))) %>%
       select(mo_yr, everything())
     
-    (ggplot(plot_df_murder,
-            aes_string(x = "mo_yr", y = input$var_y, color = "Region")) +
+    (ggplot(plot_df_murder, aes(x = mo_yr, y = .data[[input$var_y]], color = Region)) +
         geom_point(alpha = 0.5) +
         geom_line() +
         theme(legend.position = "none") +
@@ -190,7 +186,7 @@ server <- function(input, output) {
         select(mo_yr, everything())
       
       p <- ggplot(plot_df_murder,
-                  aes_string(x = "mo_yr", y = input$var_y, color = "Region")) + 
+                  aes(x = mo_yr, y = .data[[input$var_y]], color = Region)) + 
         geom_point(alpha = 0.5) + 
         geom_line() +
         theme(legend.position = "none") + 
