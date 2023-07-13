@@ -10,7 +10,7 @@ library(here)
 
 count_data <- fread(file.path("www", "FINAL_NCVS_Dataset_Model_Counts.csv"))
 proportion_data <- fread(file.path("www", "FINAL_NCVS_Dataset_Model_Proportions.csv"))
-murder_data_count <- fread(file.path("www", "FINAL_Murder_Dataset_Model_Counts.csv"))
+murder_data_count <- fread(file.path("www", "MurderCountsbyPopxlnWtotal.csv"))
 murder_data_prop <- fread(file.path("www", "FINAL_Murder_Dataset_Model_Proportions.csv"))
 
 
@@ -77,7 +77,7 @@ server <- function(input, output) {
     
     pickerInput(inputId = "var_y", label = "Select y-axis variable",
                 selected = "referenceSex_male",
-                choices = colnames(murder_data_count)[4:ncol(murder_data_count)],
+                choices = colnames(murder_data_count)[5:ncol(murder_data_count)],
                 options = list(`live-search` = TRUE),
                 multiple = FALSE)
       
