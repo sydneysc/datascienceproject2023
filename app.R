@@ -77,7 +77,7 @@ server <- function(input, output) {
     
     pickerInput(inputId = "var_y", label = "Select y-axis variable",
                 selected = "referenceSex_male",
-                choices = colnames(murder_data_count)[4:ncol(murder_data_count)],
+                choices = colnames(murder_data_count)[5:ncol(murder_data_count)],
                 options = list(`live-search` = TRUE),
                 multiple = FALSE)
       
