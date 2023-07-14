@@ -1,0 +1,298 @@
+---
+title: "Anomaly Detection Method"
+author: "Degnan, David J"
+date: "2023-07-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(tibble)
+library(tidyr)
+library(purrr)
+```
+
+## 0. Install the anomalies package from github
+
+```{r}
+#devtools::install_github("business-science/anomalize")
+library(anomalize)
+```
+
+# National Crime Victimization Survey
+
+## 1. Load and pre-clean your dataset 
+
+I recommend using data.table since it will keep our cleaned variable names for columns.
+
+```{r}
+# Read dataset 
+data <- fread("~/Git_Repos/datascienceproject2023/www/Results/FINAL_NCVS_Dataset_Model_Counts.csv")
+
+# Add a time variable
+data$Time <- as.Date(paste0(data$Year, "-", data$Month, "-1"))
+```
+
+## 2. Define variable groups 
+
+```{r}
+cols_of_interest <- colnames(data)[colnames(data) %in% c("Year", "Month", "Region", "Time") == FALSE]
+
+# Remove duplicate time information, pivot_longer, rename, filter NAs, 
+# arrange by variable, region, and time; and group by Region and Variable
+data_grouped <- data %>%
+  dplyr::select(-c("Year", "Month")) %>%
+  pivot_longer(cols = all_of(cols_of_interest)) %>%
+  dplyr::rename(Variable = name, Count = value) %>% 
+  dplyr::filter(!is.na(Count)) %>%
+  arrange(Variable, Region, Time) %>%
+  group_by(Region, Variable) 
+
+data_grouped
+```
+
+## 3. Add anomaly detection information
+
+```{r}
+# Write a function to detect anomalies
+detect_anomaly <- function(data) {
+  
+  anomalies <- data %>%
+    as.tibble() %>%
+    time_decompose(Count, method = "stl") %>%
+    anomalize(target = "remainder", method = "gesd", alpha = 0.05, max_anoms = 0.2)  
+  
+  data$Anomaly <- anomalies$anomaly
+  
+  return(data)
+  
+}
+
+# For each grouping, detect anomalies 
+data_w_anomalies <- data_grouped %>%
+  nest() %>%
+  mutate(
+    data = map(data, detect_anomaly)
+  ) %>%
+  unnest()
+
+data_w_anomalies %>% fwrite("~/Git_Repos/datascienceproject2023/www/Results/ANOMALIES_NCVS_Dataset.csv", 
+                            quote = F, row.names = F)
+
+data_w_anomalies
+```
+
+## 4. Add correlations between groups 
+
+```{r}
+# Separate our totals
+Totals <- data %>% 
+  dplyr::select(Time, Region, `Total Crime`)
+
+find_correlation <- function(the_sub, Region1, Region2) {
+  
+  if (Region2 != "Total") {
+    
+    na_remove <- the_sub %>% 
+      dplyr::filter(Region %in% c(Region1, Region2)) %>%
+      tidyr::pivot_wider(id_cols = Time, names_from = Region, values_from = Count) %>%
+      na.omit()
+    
+    correlation <- cor(na_remove[[Region1]], na_remove[[Region2]], method = "spearman")
+    
+  } else {
+    
+    na_remove <- rbind(
+      the_sub %>% dplyr::filter(Region == Region1) %>% mutate(Var = "Comp"),
+      Totals %>% dplyr::filter(Region == Region1) %>% rename(Count = `Total Crime`) %>% mutate(Var = "Total")
+    )  %>%
+      dplyr::select(-Region) %>%
+      tidyr::pivot_wider(id_cols = Time, names_from = Var, values_from = Count) %>%
+      na.omit()
+    
+    correlation <- cor(na_remove[["Comp"]], na_remove[["Total"]], method = "spearman")
+    
+  }
+  
+  if (is.na(correlation)) {correlation <- 0}
+  
+  correlation <- round(correlation, 8)
+  
+  return(correlation)
+  
+}
+
+find_correlation1 <- function(x) {find_correlation(x, Region1 = "Midwest", Region2 = "Northeast")}
+find_correlation2 <- function(x) {find_correlation(x, Region1 = "Midwest", Region2 = "South")}
+find_correlation3 <- function(x) {find_correlation(x, Region1 = "Midwest", Region2 = "West")}
+find_correlation4 <- function(x) {find_correlation(x, Region1 = "Northeast", Region2 = "South")}
+find_correlation5 <- function(x) {find_correlation(x, Region1 = "Northeast", Region2 = "West")}
+find_correlation6 <- function(x) {find_correlation(x, Region1 = "South", Region2 = "West")}
+find_correlation7 <- function(x) {find_correlation(x, Region1 = "Midwest", Region2 = "Total")}
+find_correlation8 <- function(x) {find_correlation(x, Region1 = "Northeast", Region2 = "Total")}
+find_correlation9 <- function(x) {find_correlation(x, Region1 = "South", Region2 = "Total")}
+find_correlation10 <- function(x) {find_correlation(x, Region1 = "West", Region2 = "Total")}
+
+correlations <- data %>%
+  dplyr::select(-c("Year", "Month")) %>%
+  pivot_longer(cols = all_of(cols_of_interest)) %>%
+  dplyr::rename(Variable = name, Count = value) %>%
+  group_by(Variable) %>%
+  nest() %>%
+  rename(theSub = data) %>%
+  mutate(
+    `Midwest-Northeast` = purrr::map(theSub, find_correlation1) %>% unlist(),
+    `Midwest-South` = purrr::map(theSub, find_correlation2) %>% unlist(),
+    `Midwest-West` = purrr::map(theSub, find_correlation3) %>% unlist(),
+    `Northeast-South` = purrr::map(theSub, find_correlation4) %>% unlist(),
+    `Northeast-West` = purrr::map(theSub, find_correlation5) %>% unlist(),
+    `South-West` = purrr::map(theSub, find_correlation6) %>% unlist(),
+    `Midwest-Total` = purrr::map(theSub, find_correlation7) %>% unlist(),
+    `Northeast-Total` = purrr::map(theSub, find_correlation8) %>% unlist(),
+    `South-Total` = purrr::map(theSub, find_correlation9) %>% unlist(),
+    `West-Total` = purrr::map(theSub, find_correlation10) %>% unlist()
+  ) %>%
+  dplyr::select(-theSub)
+
+correlations %>% fwrite("~/Git_Repos/datascienceproject2023/www/Results/CORRELATIONS_NCVS_Dataset.csv", 
+                            quote = F, row.names = F)
+
+correlations
+```
+
+# Murder Dataset
+
+## 1. Load and pre-clean dataset
+
+```{r}
+# Read dataset 
+murder <- fread("~/Git_Repos/datascienceproject2023/www/Results/FINAL_Murder_Dataset_Model_Counts.csv")
+
+# Month converter
+months <- c("January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December")
+murder$Month <- lapply(murder$Month, function(x) {match(x, months)}) %>% unlist()
+
+# Add a time variable
+murder$Time <- as.Date(paste0(murder$Year, "-", murder$Month, "-1"))
+```
+
+## 2. Define variable groups 
+
+```{r}
+cols_of_interest <- colnames(murder)[colnames(murder) %in% c("Year", "Month", "Region", "Time") == FALSE]
+
+# Remove duplicate time information, pivot_longer, rename, filter NAs, 
+# arrange by variable, region, and time; and group by Region and Variable
+murder_grouped <- murder %>%
+  dplyr::select(-c("Year", "Month")) %>%
+  pivot_longer(cols = all_of(cols_of_interest)) %>%
+  dplyr::rename(Variable = name, Count = value) %>% 
+  dplyr::filter(!is.na(Count)) %>%
+  arrange(Variable, Region, Time) %>%
+  group_by(Region, Variable) 
+
+murder_grouped
+```
+
+## 3. Anomaly Detection
+
+```{r}
+# For each grouping, detect anomalies 
+murder_w_anomalies <- murder_grouped %>%
+  nest() %>%
+  mutate(
+    data = map(data, detect_anomaly)
+  ) %>%
+  unnest()
+
+murder_w_anomalies %>% fwrite("~/Git_Repos/datascienceproject2023/www/Results/ANOMALIES_Murder_Dataset.csv", 
+                            quote = F, row.names = F)
+
+murder_w_anomalies
+```
+
+## 4. Add correlations between groups 
+
+```{r}
+# Separate our totals
+Totals <- murder %>% 
+  dplyr::select(Time, Region, Total)
+
+find_correlation <- function(the_sub, Region1, Region2) {
+  
+  if (Region2 != "Total") {
+    
+    na_remove <- the_sub %>% 
+      dplyr::filter(Region %in% c(Region1, Region2)) %>%
+      tidyr::pivot_wider(id_cols = Time, names_from = Region, values_from = Count) %>%
+      na.omit()
+    
+    correlation <- cor(na_remove[[Region1]], na_remove[[Region2]], method = "spearman")
+    
+  } else {
+    
+    na_remove <- rbind(
+      the_sub %>% dplyr::filter(Region == Region1) %>% mutate(Var = "Comp"),
+      Totals %>% dplyr::filter(Region == Region1) %>% rename(Count = Total) %>% mutate(Var = "Total")
+    )  %>%
+      dplyr::select(-Region) %>%
+      tidyr::pivot_wider(id_cols = Time, names_from = Var, values_from = Count) %>%
+      na.omit()
+    
+    correlation <- cor(na_remove[["Comp"]], na_remove[["Total"]], method = "spearman")
+    
+  }
+  
+  if (is.na(correlation)) {correlation <- 0}
+  
+  correlation <- round(correlation, 8)
+  
+  return(correlation)
+  
+}
+
+find_correlation1 <- function(x) {find_correlation(x, Region1 = "Midwest", Region2 = "Northeast")}
+find_correlation2 <- function(x) {find_correlation(x, Region1 = "Midwest", Region2 = "South")}
+find_correlation3 <- function(x) {find_correlation(x, Region1 = "Midwest", Region2 = "West")}
+find_correlation4 <- function(x) {find_correlation(x, Region1 = "Northeast", Region2 = "South")}
+find_correlation5 <- function(x) {find_correlation(x, Region1 = "Northeast", Region2 = "West")}
+find_correlation6 <- function(x) {find_correlation(x, Region1 = "South", Region2 = "West")}
+find_correlation7 <- function(x) {find_correlation(x, Region1 = "Midwest", Region2 = "Total")}
+find_correlation8 <- function(x) {find_correlation(x, Region1 = "Northeast", Region2 = "Total")}
+find_correlation9 <- function(x) {find_correlation(x, Region1 = "South", Region2 = "Total")}
+find_correlation10 <- function(x) {find_correlation(x, Region1 = "West", Region2 = "Total")}
+
+murder_correlations <- murder %>%
+  dplyr::select(-c("Year", "Month")) %>%
+  pivot_longer(cols = all_of(cols_of_interest)) %>%
+  dplyr::rename(Variable = name, Count = value) %>%
+  group_by(Variable) %>%
+  nest() %>%
+  rename(theSub = data) %>%
+  mutate(
+    `Midwest-Northeast` = purrr::map(theSub, find_correlation1) %>% unlist(),
+    `Midwest-South` = purrr::map(theSub, find_correlation2) %>% unlist(),
+    `Midwest-West` = purrr::map(theSub, find_correlation3) %>% unlist(),
+    `Northeast-South` = purrr::map(theSub, find_correlation4) %>% unlist(),
+    `Northeast-West` = purrr::map(theSub, find_correlation5) %>% unlist(),
+    `South-West` = purrr::map(theSub, find_correlation6) %>% unlist(),
+    `Midwest-Total` = purrr::map(theSub, find_correlation7) %>% unlist(),
+    `Northeast-Total` = purrr::map(theSub, find_correlation8) %>% unlist(),
+    `South-Total` = purrr::map(theSub, find_correlation9) %>% unlist(),
+    `West-Total` = purrr::map(theSub, find_correlation10) %>% unlist()
+  ) %>%
+  dplyr::select(-theSub)
+
+murder_correlations %>% fwrite("~/Git_Repos/datascienceproject2023/www/Results/CORRELATIONS_Murder_Dataset.csv", 
+                            quote = F, row.names = F)
+
+murder_correlations
+```
+
+
+
+
