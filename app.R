@@ -5,6 +5,7 @@ library(plotly)
 library(ggplot2)
 library(DT)
 library(data.table)
+library(dplyr)
 
 ######################
 ## Pre-Process Data ##
@@ -15,6 +16,9 @@ library(data.table)
 # Counts 
 count_data <- fread(file.path("www", "Results", "FINAL_NCVS_Dataset_Model_Counts.csv"))
 count_data$Time <- as.Date(paste0(count_data$Year, "-", count_data$Month, "-1"))
+
+# Anomalies 
+ncvs_anomalies <- fread(file.path("www", "Results", "Anomalies_NCVS_Dataset.csv"))
 
 ## Murder ##
 
@@ -38,7 +42,13 @@ ui <- fluidPage(
              sidebarLayout(
                sidebarPanel(h2("Crime Victim Profiles through Time"),
                             uiOutput("y_var_render")),
-               mainPanel(plotlyOutput(outputId = "plot"))
+               mainPanel(
+                 column(12, plotlyOutput(outputId = "plot")),
+                 column(6, plotlyOutput("midwest_anomalies", height = "200px")),
+                 column(6, plotlyOutput("northeast_anomalies", height = "200px")),
+                 column(6, plotlyOutput("south_anomalies", height = "200px")),
+                 column(6, plotlyOutput("west_anomalies"))
+               )
              )
     ),
     
@@ -98,6 +108,77 @@ server <- function(input, output) {
       
     })
   
+  })
+  
+  # Midwest anomaly plots for NCVS 
+  output$midwest_anomalies <- renderPlotly({
+    
+    if (is.null(input$y_var)) {return(NULL)}
+      
+    thedata <- ncvs_anomalies %>%
+      dplyr::filter(Region == "Midwest" & Variable == input$y_var) %>%
+      dplyr::mutate(Time = as.Date(Time)) 
+      
+    (ggplot(thedata, aes(x = Time, y = Count)) + 
+      geom_point(aes(color = Anomaly), size = 2) + 
+      scale_color_manual(values = list("Yes" = "red", "No" = "black")) +
+      theme_bw() +
+      ggtitle(paste0("Midwest: ", input$y_var))) %>% ggplotly()
+  
+    
+  })
+  
+  # Northeast anomaly plot for NCVS 
+  output$northeast_anomalies <- renderPlotly({
+    
+    if (is.null(input$y_var)) {return(NULL)}
+    
+    thedata <- ncvs_anomalies %>%
+      dplyr::filter(Region == "Northeast" & Variable == input$y_var) %>%
+      dplyr::mutate(Time = as.Date(Time)) 
+    
+    (ggplot(thedata, aes(x = Time, y = Count)) + 
+        geom_point(aes(color = Anomaly), size = 2) + 
+        scale_color_manual(values = list("Yes" = "red", "No" = "black")) +
+        theme_bw() +
+        ggtitle(paste0("Notheast: ", input$y_var))) %>% ggplotly()
+    
+    
+  })
+  
+  # Anomaly plots for NCVS 
+  output$south_anomalies <- renderPlotly({
+    
+    if (is.null(input$y_var)) {return(NULL)}
+    
+    thedata <- ncvs_anomalies %>%
+      dplyr::filter(Region == "South" & Variable == input$y_var) %>%
+      dplyr::mutate(Time = as.Date(Time)) 
+    
+    (ggplot(thedata, aes(x = Time, y = Count)) + 
+        geom_point(aes(color = Anomaly), size = 2) + 
+        scale_color_manual(values = list("Yes" = "red", "No" = "black")) +
+        theme_bw() +
+        ggtitle(paste0("South: ", input$y_var))) %>% ggplotly()
+    
+    
+  })
+  
+  # Anomaly plots for NCVS 
+  output$west_anomalies <- renderPlotly({
+    
+    if (is.null(input$y_var)) {return(NULL)}
+    
+    thedata <- ncvs_anomalies %>%
+      dplyr::filter(Region == "West" & Variable == input$y_var) %>%
+      dplyr::mutate(Time = as.Date(Time)) 
+    
+    (ggplot(thedata, aes(x = Time, y = Count)) + 
+        geom_point(aes(color = Anomaly), size = 2) + 
+        scale_color_manual(values = list("Yes" = "red", "No" = "black")) +
+        theme_bw() +
+        ggtitle(paste0("West: ", input$y_var))) %>% ggplotly()
+    
   })
   
   # Render plot for murder
