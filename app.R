@@ -32,6 +32,11 @@ MonthConversion <- c("January", "February", "March", "April", "May", "June",
 murder_data_count$Month <- lapply(murder_data_count$Month, function(x) {match(x, MonthConversion)}) %>% unlist()
 murder_data_count$Time <- as.Date(paste0(murder_data_count$Year, "-", murder_data_count$Month, "-1"))
 
+# Anomalies
+murder_anomalies <- fread(file.path("www", "Results", "ANOMALIES_Murder_Dataset.csv"))
+
+# Correlation
+murder_correlation <- fread(file.path("www", "Results", "CORRELATIONS_Murder_Dataset.csv"))
 
 ########
 ## UI ##
@@ -55,8 +60,9 @@ ui <- fluidPage(
     tabPanel("Murder Dataset", fluid = TRUE,
              sidebarLayout(
                sidebarPanel(h2("Murder Victim Profiles through Time"),
-                            uiOutput("murder_y_var_render")),
-               mainPanel(plotlyOutput(outputId = "plot_two"))
+                            uiOutput("murder_y_var_render"),
+                            DTOutput("murder_correlations")),
+               mainPanel(plotlyOutput(outputId = "plot_two", height = "900px"))
              ))
   )
 )
@@ -203,39 +209,110 @@ server <- function(input, output) {
     
     if (is.null(input$var_y)) {return(NULL)}
     
-    (ggplot(murder_data_count, aes(x = Time, y = .data[[input$var_y]], color = Region)) +
-        geom_point(alpha = 0.5) +
+    total_plot <- ggplotly({
+      
+      ggplot(murder_data_count, aes(x = Time, y = .data[[input$var_y]], color = Region)) + 
+        geom_point(alpha = 0.5) + 
         geom_line() +
-        theme(legend.position = "none") +
+        theme(legend.position = "none") + 
         xlab("Month & Year") +
         ylab("Count") +
         theme_bw() +
-        theme(axis.text.x = element_text(angle = 45)) +
-        ggtitle(input$var_y)) %>%
-      ggplotly()
+        theme(axis.text.x = element_text(angle = 45)) 
+      
+    })
+    
+    midwest_data <- murder_anomalies %>%
+      dplyr::filter(Region == "Midwest" & Variable == input$var_y) %>%
+      dplyr::mutate(Time = as.Date(Time)) 
+    
+    midwest_plot <- (ggplot(midwest_data, aes(x = Time, y = Count)) + 
+                       geom_point(aes(color = Anomaly), size = 2) + 
+                       scale_color_manual(values = list("Yes" = "red", "No" = "black")) +
+                       theme_bw()) %>% ggplotly()
+    
+    northeast_data <- murder_anomalies %>%
+      dplyr::filter(Region == "Northeast" & Variable == input$var_y) %>%
+      dplyr::mutate(Time = as.Date(Time)) 
+    
+    northeast_plot <- (ggplot(northeast_data, aes(x = Time, y = Count)) + 
+                         geom_point(aes(color = Anomaly), size = 2) + 
+                         scale_color_manual(values = list("Yes" = "red", "No" = "black")) +
+                         theme_bw()) %>% ggplotly()
+    
+    south_data <- murder_anomalies %>%
+      dplyr::filter(Region == "South" & Variable == input$var_y) %>%
+      dplyr::mutate(Time = as.Date(Time)) 
+    
+    south_plot <- (ggplot(south_data, aes(x = Time, y = Count)) + 
+                     geom_point(aes(color = Anomaly), size = 2) + 
+                     scale_color_manual(values = list("Yes" = "red", "No" = "black")) +
+                     theme_bw()) %>% ggplotly()
+    
+    west_data <- murder_anomalies %>%
+      dplyr::filter(Region == "West" & Variable == input$var_y) %>%
+      dplyr::mutate(Time = as.Date(Time)) 
+    
+    west_plot <- (ggplot(west_data, aes(x = Time, y = Count)) + 
+                    geom_point(aes(color = Anomaly), size = 2) + 
+                    scale_color_manual(values = list("Yes" = "red", "No" = "black")) +
+                    theme_bw()) %>% ggplotly()
+    
+    
+    subplot(
+      total_plot, midwest_plot, northeast_plot, south_plot, west_plot, 
+      nrows = 5, shareX = TRUE, titleY = TRUE, titleX = TRUE
+    ) %>%
+      layout(
+        title = list(text = ""),
+        legend = list(title = list(text = "Legend")),
+        annotations = list(
+          list(
+            x = 0.1, xref = "paper", xanchor = "center",  
+            y = 1, yref = "paper", yanchor = "bottom",  
+            text = "Counts per Region", showarrow = FALSE
+          ),
+          list(
+            x = 0.1, xref = "paper", xanchor = "center",
+            y = 0.78, yref = "paper", yanchor = "bottom",
+            text = "Midwest Anomalies", showarrow = FALSE
+          ),
+          list(
+            x = 0.1, xref = "paper", xanchor = "center",
+            y = 0.58, yref = "paper", yanchor = "bottom",
+            text = "Northeast Anomalies", showarrow = FALSE
+          ),
+          list(
+            x = 0.1, xref = "paper", xanchor = "center",
+            y = 0.38, yref = "paper", yanchor = "bottom",
+            text = "South Anomalies", showarrow = FALSE
+          ),
+          list(
+            x = 0.1, xref = "paper", xanchor = "center",
+            y = 0.18, yref = "paper", yanchor = "bottom",
+            text = "West Anomalies", showarrow = FALSE
+          )
+        )
+      )
       
   })
   
+  # NCVS correlations table
+  output$murder_correlations <- renderDT({
+    
+    if (is.null(input$var_y)) {return(NULL)}
+    
+    murder <- murder_correlation %>%
+      dplyr::filter(Variable == input$var_y) %>%
+      dplyr::select(-Variable) %>% 
+      t()
+    colnames(murder) <- "Spearman Correlation"
+    murder <- round(murder, 6)
+    
+    DT::datatable(murder, options = list(dom = 't'), filter = "none")
+    
+  })
   
-  #output$table <- renderDT({
-  #  
-  #  if (is.null(input$data_format)) {return(NULL)}
-  #  
-  #  if (input$data_format == "Count") {
-  #    data <- data.frame(
-  #      Variable = colnames(count_data)[4:length(colnames(count_data))],
-  #      Importance = NA
-  #    )
-  #  } else if (input$data_format == "Proportion") {
-  #    data <- data.frame(
-  #      Variable = colnames(proportion_data)[5:length(colnames(proportion_data))],
-  #      Importance = NA
-  #    )
-  #  }
-  #
-  #  datatable(data, options = list(scrollX = TRUE), select = "single")
-  #  
-  #})
   
 }  
 
