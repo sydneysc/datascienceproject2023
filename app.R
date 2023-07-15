@@ -14,29 +14,29 @@ library(dplyr)
 ## NCVS ##
 
 # Counts 
-count_data <- fread(file.path("www", "Results", "FINAL_NCVS_Dataset_Model_Counts.csv"))
+count_data <- fread(file.path("www", "FINAL_NCVS_Dataset_Model_Counts.csv"))
 count_data$Time <- as.Date(paste0(count_data$Year, "-", count_data$Month, "-1"))
 
 # Anomalies 
-ncvs_anomalies <- fread(file.path("www", "Results", "ANOMALIES_NCVS_Dataset.csv"))
+ncvs_anomalies <- fread(file.path("www", "ANOMALIES_NCVS_Dataset.csv"))
 
 # Correlation
-ncvs_correlation <- fread(file.path("www", "Results", "CORRELATIONS_NCVS_dataset.csv"))
+ncvs_correlation <- fread(file.path("www", "CORRELATIONS_NCVS_Dataset.csv"))
 
 ## Murder ##
 
 # Counts
-murder_data_count <- fread(file.path("www", "Results", "FINAL_Murder_Dataset_Model_Counts.csv"))
+murder_data_count <- fread(file.path("www", "FINAL_Murder_Dataset_Model_Counts.csv"))
 MonthConversion <- c("January", "February", "March", "April", "May", "June",
                      "July", "August", "September", "October", "November", "December")
 murder_data_count$Month <- lapply(murder_data_count$Month, function(x) {match(x, MonthConversion)}) %>% unlist()
 murder_data_count$Time <- as.Date(paste0(murder_data_count$Year, "-", murder_data_count$Month, "-1"))
 
 # Anomalies
-murder_anomalies <- fread(file.path("www", "Results", "ANOMALIES_Murder_Dataset.csv"))
+murder_anomalies <- fread(file.path("www", "ANOMALIES_Murder_Dataset.csv"))
 
 # Correlation
-murder_correlation <- fread(file.path("www", "Results", "CORRELATIONS_Murder_Dataset.csv"))
+murder_correlation <- fread(file.path("www", "CORRELATIONS_Murder_Dataset.csv"))
 
 ########
 ## UI ##
