@@ -18,7 +18,10 @@ count_data <- fread(file.path("www", "Results", "FINAL_NCVS_Dataset_Model_Counts
 count_data$Time <- as.Date(paste0(count_data$Year, "-", count_data$Month, "-1"))
 
 # Anomalies 
-ncvs_anomalies <- fread(file.path("www", "Results", "Anomalies_NCVS_Dataset.csv"))
+ncvs_anomalies <- fread(file.path("www", "Results", "ANOMALIES_NCVS_Dataset.csv"))
+
+# Correlation
+ncvs_correlation <- fread(file.path("www", "Results", "CORRELATIONS_NCVS_dataset.csv"))
 
 ## Murder ##
 
@@ -41,7 +44,8 @@ ui <- fluidPage(
     tabPanel("Crime Victimization Survey", fluid = TRUE,
              sidebarLayout(
                sidebarPanel(h2("Crime Victim Profiles through Time"),
-                            uiOutput("y_var_render")),
+                            uiOutput("y_var_render"),
+                            DTOutput("ncvs_correlations")),
                mainPanel(
                  plotlyOutput(outputId = "plot", height = "900px"),
                )
@@ -65,10 +69,10 @@ server <- function(input, output) {
   
   # Render y variable selecter for crime 
   output$y_var_render <- renderUI({
-      
+    
     pickerInput(inputId = "y_var", label = "Select y-axis variable",
                 selected = "Total Crime",
-                choices = colnames(count_data)[4:ncol(count_data)],
+                choices = colnames(count_data)[colnames(count_data) %in% c("Year", "Month", "Region", "Time") == FALSE],
                 options = list(`live-search` = TRUE),
                 multiple = FALSE)
       
@@ -79,7 +83,7 @@ server <- function(input, output) {
     
     pickerInput(inputId = "var_y", label = "Select y-axis variable",
                 selected = "Total",
-                choices = colnames(murder_data_count)[4:ncol(murder_data_count)],
+                choices = colnames(murder_data_count)[colnames(murder_data_count) %in% c("Year", "Month", "Region", "Time") == FALSE],
                 options = list(`live-search` = TRUE),
                 multiple = FALSE)
     
@@ -176,6 +180,21 @@ server <- function(input, output) {
        )
       )
     
+  })
+  
+  # NCVS correlations table
+  output$ncvs_correlations <- renderDT({
+    
+    if (is.null(input$y_var)) {return(NULL)}
+    
+    ncvs <- ncvs_correlation %>%
+      dplyr::filter(Variable == input$y_var) %>%
+      dplyr::select(-Variable) %>% 
+      t()
+    colnames(ncvs) <- "Spearman Correlation"
+    ncvs <- round(ncvs, 6)
+    
+    DT::datatable(ncvs, options = list(dom = 't'), filter = "none")
     
   })
   
